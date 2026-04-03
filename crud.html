@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Elite CRUD Dashboard</title>
+<style>
+* {
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+/* 🌈 ANIMATED GRADIENT BACKGROUND */
+body {
+  margin: 0;
+  color: #e2e8f0;
+  background: linear-gradient(-45deg, #0f172a, #1e3a8a, #020617, #0ea5e9);
+  background-size: 400% 400%;
+  animation: gradientBG 12s ease infinite;
+}
+
+/* Gradient Animation */
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* LAYOUT */
+.container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  padding: 25px;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  animation: slideInLeft 0.6s ease;
+}
+
+/* SLIDE ANIMATION */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity:0; }
+  to { transform: translateX(0); opacity:1; }
+}
+
+/* INPUTS */
+input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.05);
+  border: none;
+  color: white;
+  border-radius: 10px;
+  transition: 0.3s;
+}
+
+input:focus {
+  background: rgba(255,255,255,0.1);
+  outline: none;
+  box-shadow: 0 0 10px #0ea5e9;
+}
+
+/* BUTTONS */
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 5px;
+  margin-right: 5px;
+  transition: 0.3s;
+}
+
+button:hover {
+  transform: scale(1.05);
+}
+
+/* COLORS */
+.save { background: #22c55e; color: white; }
+.cancel { background: #ef4444; color: white; }
+.edit { background: #3b82f6; color: white; }
+.delete { background: #ef4444; color: white; }
+.view { background: #8b5cf6; color: white; }
+
+/* MAIN */
+.main {
+  padding: 25px;
+  animation: fadeIn 0.8s ease;
+}
+
+/* FADE IN */
+@keyframes fadeIn {
+  from { opacity:0; transform: translateY(20px); }
+  to { opacity:1; transform: translateY(0); }
+}
+
+/* SEARCH */
+.search input {
+  width: 320px;
+  margin: 20px 0;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+th {
+  background: rgba(0,0,0,0.7);
+}
+
+th, td {
+  padding: 14px;
+  text-align: center;
+}
+
+/* ROW HOVER ANIMATION */
+tr {
+  transition: 0.3s;
+}
+
+tr:hover {
+  background: rgba(14,165,233,0.2);
+  transform: scale(1.01);
+}
+
+/* MODAL */
+.modal {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.8);
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+/* POPUP ANIMATION */
+.modal-content {
+  background:#020617;
+  padding:20px;
+  border-radius:12px;
+  width:300px;
+  animation: popUp 0.3s ease;
+}
+
+@keyframes popUp {
+  from { transform: scale(0.7); opacity:0; }
+  to { transform: scale(1); opacity:1; }
+}
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #0ea5e9;
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: none;
+  animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity:0; }
+  to { transform: translateY(0); opacity:1; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2>Add / Edit User</h2>
+    <input id="name" placeholder="Name">
+    <input id="id" placeholder="ID">
+    <input id="address" placeholder="Address">
+    <input id="designation" placeholder="Designation">
+
+    <button class="save" onclick="saveUser()">Save</button>
+    <button class="cancel" onclick="resetForm()">Cancel</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <h2>KASHISH</h2>
+    <h2>24CA2036</h2>
+    <!-- SEARCH -->
+    <div class="search">
+      <input placeholder="Search..." oninput="searchUser(this.value)">
+    </div>
+
+    <!-- TABLE -->
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>ID</th>
+          <th>Address</th>
+          <th>Designation</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <h3>User Details</h3>
+    <p id="viewData"></p>
+    <button onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script>
+  let users = [];
+let filtered = [];
+let editIndex = null;
+
+// FETCH USERS
+async function fetchUsers() {
+  const res = await fetch('https://jsonplaceholder.typicode.com/users');
+  const data = await res.json();
+
+  users = data.map(u => ({
+    name: u.name,
+    id: u.id,
+    address: u.address.city,
+    designation: "Employee"
+  }));
+
+  filtered = [...users];
+  render();
+}
+
+// RENDER TABLE
+function render() {
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+
+  filtered.forEach((u, i) => {
+    tbody.innerHTML += `
+      <tr>
+        <td contenteditable onblur="update(${i}, 'name', this.innerText)">${u.name}</td>
+        <td>${u.id}</td>
+        <td contenteditable onblur="update(${i}, 'address', this.innerText)">${u.address}</td>
+        <td contenteditable onblur="update(${i}, 'designation', this.innerText)">${u.designation}</td>
+        <td>
+          <button class="view" onclick="viewUser(${i})">View</button>
+          <button class="edit" onclick="editUser(${i})">Edit</button>
+          <button class="delete" onclick="deleteUser(${i})">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// SAVE / UPDATE
+function saveUser() {
+  const u = {
+    name: name.value,
+    id: id.value,
+    address: address.value,
+    designation: designation.value
+  };
+
+  if (!u.name || !u.id) {
+    showToast("Name & ID required");
+    return;
+  }
+
+  if (editIndex !== null) {
+    filtered[editIndex] = u;
+    users = [...filtered];
+    editIndex = null;
+    showToast("User Updated");
+  } else {
+    users.push(u);
+    showToast("User Added");
+  }
+
+  filtered = [...users];
+  render();
+  resetForm();
+}
+
+// EDIT
+function editUser(i) {
+  const u = filtered[i];
+
+  name.value = u.name;
+  id.value = u.id;
+  address.value = u.address;
+  designation.value = u.designation;
+
+  editIndex = i;
+  showToast("Editing...");
+}
+
+// INLINE UPDATE
+function update(i, field, value) {
+  filtered[i][field] = value;
+  showToast("Updated");
+}
+
+// DELETE
+function deleteUser(i) {
+  if (confirm("Delete this user?")) {
+    filtered.splice(i, 1);
+    users = [...filtered];
+    render();
+    showToast("Deleted");
+  }
+}
+
+// VIEW MODAL
+function viewUser(i) {
+  const u = filtered[i];
+
+  document.getElementById("viewData").innerHTML = `
+    <b>Name:</b> ${u.name}<br>
+    <b>ID:</b> ${u.id}<br>
+    <b>Address:</b> ${u.address}<br>
+    <b>Designation:</b> ${u.designation}
+  `;
+
+  document.getElementById("modal").style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("modal").style.display = "none";
+}
+
+// SEARCH
+function searchUser(q) {
+  filtered = users.filter(u =>
+    u.name.toLowerCase().includes(q.toLowerCase())
+  );
+  render();
+}
+
+// RESET
+function resetForm() {
+  document.querySelectorAll("input").forEach(i => i.value="");
+  editIndex = null;
+}
+
+// TOAST
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.innerText = msg;
+  t.style.display = "block";
+  setTimeout(() => t.style.display = "none", 2000);
+}
+
+// INIT
+fetchUsers();
+</script>
+
+</body>
+</html>
